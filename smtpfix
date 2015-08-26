@@ -1,0 +1,139 @@
+#!/usr/bin/php
+<?php
+
+# Definitions
+
+$FORCE_MAIL_FROM = null; // Null to read from X-Cron-Env headers,
+$FORCE_MAIL_TO   = null; // or "dest@host.tld" to a fixed address.
+
+$strip = true;  // Strips X-Cron-Env headers?
+$debug = false; // Verbose debug? (run nullmailer-send to see)
+
+$argv[0] = substr( $argv[0] , 0 , strlen( $argv[0] ) - 3 ); // Remove 'fix' at the end. Beware of fork bombs!
+
+# Read
+
+$body = explode( "\n" , file_get_contents( 'php://stdin' ) );
+
+for ( $i = 0 ; $i < count( $body ) ; $i++ )
+{
+	$line = $body[$i];
+	
+	if ( $debug )
+		print "i> " . $line . "\n";
+	
+	if ( strpos( $line , "X-Cron-Env: " ) !== false )
+	{
+		if ( $strip )
+			$body[$i] = null;
+		
+		if ( $FORCE_MAIL_FROM == null and strpos( $line , "MAIL_FROM=" ) > 0 )
+		{
+			$line = str_replace( "X-Cron-Env: " , "" , $line );
+			$line = str_replace( "MAIL_FROM=" , "" , $line );
+			$line = str_replace( ">" , "" , $line );
+			$line = str_replace( "<" , "" , $line );
+			$line = trim( $line );
+			$FORCE_MAIL_FROM = $line;
+			continue;
+		}
+		
+		if ( $FORCE_MAIL_TO == null and strpos( $line , "MAIL_TO=" ) > 0 )
+		{
+			$line = str_replace( "X-Cron-Env: " , "" , $line );
+			$line = str_replace( "MAIL_TO=" , "" , $line );
+			$line = str_replace( ">" , "" , $line );
+			$line = str_replace( "<" , "" , $line );
+			$line = trim( $line );
+			$FORCE_MAIL_TO = $line;
+			continue;
+		}
+	}
+}
+
+if ( trim( $FORCE_MAIL_FROM ) == "" ) $FORCE_MAIL_FROM = null;
+if ( trim( $FORCE_MAIL_TO   ) == "" ) $FORCE_MAIL_TO   = null;
+
+if ( $FORCE_MAIL_FROM == null and $FORCE_MAIL_TO != null ) $FORCE_MAIL_FROM = $FORCE_MAIL_TO;
+if ( $FORCE_MAIL_FROM != null and $FORCE_MAIL_TO == null ) $FORCE_MAIL_TO = $FORCE_MAIL_FROM;
+
+
+if ( $debug )
+{
+	print "---\n";	
+	print "new MAIL FROM: " . $FORCE_MAIL_FROM . "\n";
+	print "new MAIL TO:   " . $FORCE_MAIL_TO . "\n";
+	print "---\n";
+}
+
+# Replace
+
+if ( $FORCE_MAIL_FROM != null ) $body[ 0 ] = $FORCE_MAIL_FROM;
+if ( $FORCE_MAIL_TO   != null ) $body[ 1 ] = $FORCE_MAIL_TO;
+
+for ( $i = 0 ; $i < count( $body ) ; $i++ )
+{
+	if ( $FORCE_MAIL_FROM != null and substr( $body[$i] , 0 , 6 ) == "From: " )
+	{
+		$body[$i] = "From: " . $FORCE_MAIL_FROM;
+		$FORCE_MAIL_FROM = null;
+	}
+	
+	if ( $FORCE_MAIL_TO != null and substr( $body[$i] , 0 , 4 ) == "To: " )
+	{
+		$body[$i] = "To: " . $FORCE_MAIL_TO;
+		$FORCE_MAIL_TO = null;
+	}
+}
+
+# Real call
+
+$cmd = implode( " " , $argv ) ;
+$pipes = array( array( 'pipe' , 'r' ) , array( 'pipe' , 'w' ) , array( 'pipe' , 'w' ) );
+
+$proc = proc_open( $cmd , $pipes , $pipes );
+
+foreach( $body as $line )
+{
+	if ( $line !== null )
+	{
+		if ( $debug )
+			print "o> " . $line . "\n";
+		fwrite( $pipes[0] , $line . "\n" );
+	}
+}
+
+fclose( $pipes[0] );
+
+$out = stream_get_contents( $pipes[1] );
+$err = stream_get_contents( $pipes[2] );
+
+fclose( $pipes[1] );
+fclose( $pipes[2] );
+
+$ret = proc_close( $proc );
+
+# Debug
+
+if ( $debug )
+{
+	print "---\n";
+	print "RET: " . $ret . "\n";
+	
+	if ( $out != "" )
+	{
+		print "OUT:\n";
+		print $out . "\n";
+	}
+	if ( $err != "" )
+	{
+		print "ERR:\n";
+		print $err . "\n";
+	}
+	
+	print "---\n";
+}
+
+# The end
+
+return $ret;
