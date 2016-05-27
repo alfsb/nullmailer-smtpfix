@@ -16,9 +16,9 @@ For older emails in spool (or very old cron and nullmailer versions), it's possi
 
 ## How to use
 
-1. Change to nullmailer's ["format executable"](http://www.troubleshooters.com/linux/nullmailer/landmines.htm#_nullmailer_mental_model) for MTA dir. Most likely `/usr/lib/nullmailer`.
-2. Download `smptfix` from [from here](https://raw.githubusercontent.com/alfsb/nullmailer-smtpfix/master/smptfix).
-3. Set up the same user & mod bits from `stmp`.
+1. Change to nullmailer's ["format executable"](http://www.troubleshooters.com/linux/nullmailer/landmines.htm#_nullmailer_mental_model) MTA dir. Most likely `/usr/lib/nullmailer`.
+2. Download `smptfix` from [from here](https://raw.githubusercontent.com/alfsb/nullmailer-smtpfix/master/smtpfix).
+3. `chown` and `chmod ` this file using `stmp` as reference.
 4. Change nullmailer's `remotes` file, replacing first `stmp` in each line by `stmpfix`.
 5. Profit.
 
@@ -35,7 +35,7 @@ Replacing nullmailse's default executables may cause your mail to be lost, your 
 ```bash
 sudo bash
 cd /usr/lib/nullmailer
-wget https://raw.githubusercontent.com/alfsb/nullmailer-smtpfix/master/smptfix
+wget https://raw.githubusercontent.com/alfsb/nullmailer-smtpfix/master/smtpfix
 chown --reference=smtp smtpfix
 chmod --reference=smtp smtpfix
 nano /etc/nullmailer/remotes
