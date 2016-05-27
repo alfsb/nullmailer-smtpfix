@@ -136,4 +136,4 @@ if ( $debug )
 
 # The end
 
-return $ret;
+exit( $ret );
