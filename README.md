@@ -10,13 +10,13 @@ You email don't leave your server, getting errors as `Failed: 504 5.5.2 <user@ho
 
 ## The solution
 
-This script can transform specific `X-Cron-Env:` headers into `From:` and `To:` RFC 2822 headers.
+This script captures and transform very specific headers into `From:` and `To:` RFC 2822 headers.
 
 For older emails in spool (or very old cron and nullmailer versions), it's possible to force specific `From:` and `To:` headers directly from script.
 
 ## How to use
 
-1. Change to nullmailer's ["format executable"](http://www.troubleshooters.com/linux/nullmailer/landmines.htm#_nullmailer_mental_model) MTA dir. Most likely `/usr/lib/nullmailer`.
+1. Go to nullmailer's ["format executable"](http://www.troubleshooters.com/linux/nullmailer/landmines.htm#_nullmailer_mental_model MTA dir). Most likely `/usr/lib/nullmailer`.
 2. Download `smptfix` from [from here](https://raw.githubusercontent.com/alfsb/nullmailer-smtpfix/master/smtpfix).
 3. `chown` and `chmod ` this file using `stmp` as reference.
 4. Change nullmailer's `remotes` file, replacing first `stmp` in each line by `stmpfix`.
