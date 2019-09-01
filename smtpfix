@@ -3,86 +3,75 @@
 
 # Definitions
 
-$FORCE_MAIL_FROM = null; // Null to read from X-Cron-Env headers,
-$FORCE_MAIL_TO   = null; // or "dest@host.tld" to a fixed address.
+$debug = false;     // Verbose debug? (run nullmailer-send to see)
+$abort = false;     // Return a error so nullmailer dont delete mails in spool. Beware: bulk sends in duplicate!!!
 
-$strip = true;  // Strips X-Cron-Env headers?
-$debug = false; // Verbose debug? (run nullmailer-send to see)
+$MAIL_FROM = null;	// Null to read from X-Cron-Env headers, or "dest@host.tld" to a fixed address.
+$MAIL_TO   = null;
 
-$argv[0] = substr( $argv[0] , 0 , strlen( $argv[0] ) - 3 ); // Remove 'fix' at the end. Beware of fork bombs!
+$argv[0] = str_replace( "smtpfix" , "smtp" , $argv[0] );
 
-# Read
+# Read & capture
 
-$body = explode( "\n" , file_get_contents( 'php://stdin' ) );
+$lines = explode( "\n" , file_get_contents( 'php://stdin' ) );
 
-for ( $i = 0 ; $i < count( $body ) ; $i++ )
+for ( $i = 0 ; $i < count( $lines ) ; $i++ )
 {
-	$line = $body[$i];
-	
 	if ( $debug )
-		print "i> " . $line . "\n";
+		print "i> " . $lines[$i] . "\n";
 	
-	if ( strpos( $line , "X-Cron-Env: " ) !== false )
+	if ( $MAIL_FROM == null and substr( $lines[$i] , 0 , 5 ) == "From:" )
 	{
-		if ( $strip )
-			$body[$i] = null;
-		
-		if ( $FORCE_MAIL_FROM == null and strpos( $line , "MAIL_FROM=" ) > 0 )
-		{
-			$line = str_replace( "X-Cron-Env: " , "" , $line );
-			$line = str_replace( "MAIL_FROM=" , "" , $line );
-			$line = str_replace( ">" , "" , $line );
-			$line = str_replace( "<" , "" , $line );
-			$line = trim( $line );
-			$FORCE_MAIL_FROM = $line;
-			continue;
-		}
-		
-		if ( $FORCE_MAIL_TO == null and strpos( $line , "MAIL_TO=" ) > 0 )
-		{
-			$line = str_replace( "X-Cron-Env: " , "" , $line );
-			$line = str_replace( "MAIL_TO=" , "" , $line );
-			$line = str_replace( ">" , "" , $line );
-			$line = str_replace( "<" , "" , $line );
-			$line = trim( $line );
-			$FORCE_MAIL_TO = $line;
-			continue;
-		}
+		$MAIL_FROM = trim( substr( $lines[$i] , 5 ) );
+		$MAIL_FROM = str_replace( "<" , "" , $MAIL_FROM );
+		$MAIL_FROM = str_replace( ">" , "" , $MAIL_FROM );
+	}
+	
+	if ( $MAIL_TO != null and substr( $lines[$i] , 0 , 3 ) == "To:" )
+	{
+		$MAIL_TO = trim( substr( $lines[$i] , 3 ) );
+		$MAIL_TO = str_replace( "<" , "" , $MAIL_TO );
+		$MAIL_TO = str_replace( ">" , "" , $MAIL_TO );
 	}
 }
 
-if ( trim( $FORCE_MAIL_FROM ) == "" ) $FORCE_MAIL_FROM = null;
-if ( trim( $FORCE_MAIL_TO   ) == "" ) $FORCE_MAIL_TO   = null;
+if ( $MAIL_FROM == null ) $MAIL_FROM = $lines[0];
+if ( $MAIL_TO   == null ) $MAIL_TO   = $lines[1];
 
-if ( $FORCE_MAIL_FROM == null and $FORCE_MAIL_TO != null ) $FORCE_MAIL_FROM = $FORCE_MAIL_TO;
-if ( $FORCE_MAIL_FROM != null and $FORCE_MAIL_TO == null ) $FORCE_MAIL_TO = $FORCE_MAIL_FROM;
+if ( trim( $MAIL_FROM ) == "" ) $MAIL_FROM = null;
+if ( trim( $MAIL_TO   ) == "" ) $MAIL_TO   = null;
 
+if ( $MAIL_FROM == null and $MAIL_TO != null ) $MAIL_FROM = $MAIL_TO;
+if ( $MAIL_FROM != null and $MAIL_TO == null ) $MAIL_TO = $MAIL_FROM;
 
 if ( $debug )
 {
 	print "---\n";	
-	print "new MAIL FROM: " . $FORCE_MAIL_FROM . "\n";
-	print "new MAIL TO:   " . $FORCE_MAIL_TO . "\n";
+	print "FROM: " . $MAIL_FROM . "\n";
+	print "TO:   " . $MAIL_TO . "\n";
 	print "---\n";
 }
 
 # Replace
 
-if ( $FORCE_MAIL_FROM != null ) $body[ 0 ] = $FORCE_MAIL_FROM;
-if ( $FORCE_MAIL_TO   != null ) $body[ 1 ] = $FORCE_MAIL_TO;
+if ( $MAIL_FROM != null ) $lines[ 0 ] = $MAIL_FROM;
+if ( $MAIL_TO   != null ) $lines[ 1 ] = $MAIL_TO;
 
-for ( $i = 0 ; $i < count( $body ) ; $i++ )
+for ( $i = 0 ; $i < count( $lines ) ; $i++ )
 {
-	if ( $FORCE_MAIL_FROM != null and substr( $body[$i] , 0 , 6 ) == "From: " )
+	if ( $MAIL_FROM != null and substr( $lines[$i] , 0 , 5 ) == "From:" )
 	{
-		$body[$i] = "From: " . $FORCE_MAIL_FROM;
-		$FORCE_MAIL_FROM = null;
+		$lines[$i] = "From: " . $MAIL_FROM;
 	}
 	
-	if ( $FORCE_MAIL_TO != null and substr( $body[$i] , 0 , 4 ) == "To: " )
+	if ( $MAIL_TO != null and substr( $lines[$i] , 0 , 3 ) == "To:" )
 	{
-		$body[$i] = "To: " . $FORCE_MAIL_TO;
-		$FORCE_MAIL_TO = null;
+		$lines[$i] = "To: " . $MAIL_TO;
+	}
+	
+	if ( $MAIL_TO != null and $lines[$i] == "Cc: recipient list not shown: ;" )
+	{
+		$lines[$i] = "To: " . $MAIL_TO;
 	}
 }
 
@@ -93,7 +82,7 @@ $pipes = array( array( 'pipe' , 'r' ) , array( 'pipe' , 'w' ) , array( 'pipe' , 
 
 $proc = proc_open( $cmd , $pipes , $pipes );
 
-foreach( $body as $line )
+foreach( $lines as $line )
 {
 	if ( $line !== null )
 	{
@@ -122,11 +111,13 @@ if ( $debug )
 	
 	if ( $out != "" )
 	{
+		print "---\n";
 		print "OUT:\n";
 		print $out . "\n";
 	}
 	if ( $err != "" )
 	{
+		print "---\n";
 		print "ERR:\n";
 		print $err . "\n";
 	}
@@ -136,4 +127,7 @@ if ( $debug )
 
 # The end
 
-exit( $ret );
+if ( $abort )
+	exit( -1 );
+else
+	exit( $ret );
